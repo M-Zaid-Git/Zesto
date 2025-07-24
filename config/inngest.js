@@ -1,11 +1,11 @@
 import { Inngest } from "inngest";
 import connectDB from "./db";
+import User from "@/models/User";
 
 // Create a client to send and receive events
 export const inngest = new Inngest({ id: "Zesto" });
 
-// innngest functio to save user data to database
-
+// inngest function to save user data to database
 export const syncUserCreation = inngest.createFunction(
     {
         id: 'sync-user-from-clerk',
@@ -25,12 +25,10 @@ export const syncUserCreation = inngest.createFunction(
         await connectDB();
         await User.create(userData);
     }
-
 )
 
-
-// adjust function to update user data in database
-export const syncUserUpdate = inngest.createFunction(
+// function to update user data in database
+export const syncUserUpdated = inngest.createFunction(
     {
         id:'update-user-from-clerk',
     },
@@ -61,8 +59,5 @@ export const syncUserDeletion = inngest.createFunction(
         const { id } = event.data;
         await connectDB();
         await User.findByIdAndDelete(id);
-        
-        
-
     }
 )

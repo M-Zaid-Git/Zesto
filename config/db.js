@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
 
-let cached = GlobalError.mongoose;
+let cached = global.mongoose;
 
 if (!cached) {
-  cached = GlobalError.mongoose = { conn: null, promise: null };
+  cached = global.mongoose = { conn: null, promise: null };
 }
 
 async function connectDB() {
