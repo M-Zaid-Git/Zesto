@@ -1,8 +1,11 @@
 'use client'
 import { productsDummyData, userDummyData } from "@/assets/assets";
-import { useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
+import axios from "axios";
+import { err } from "inngest/types";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
 export const AppContext = createContext();
 
@@ -15,18 +18,58 @@ export const AppContextProvider = (props) => {
     const currency = process.env.NEXT_PUBLIC_CURRENCY
     const router = useRouter()
     const { user } = useUser();
+    const { getToken } = useAuth();
 
     const [products, setProducts] = useState([])
     const [userData, setUserData] = useState(false)
-    const [isSeller, setIsSeller] = useState(true)
+    const [isSeller, setIsSeller] = useState(false)
     const [cartItems, setCartItems] = useState({})
 
     const fetchProductData = async () => {
-        setProducts(productsDummyData)
+        try {
+
+            const { data } = await axios.get('/api/product/list');
+            if (data.success) {
+                setProducts(data.products);
+            } else {
+                toast.error(data.message || 'Failed to fetch products');
+            }
+            
+        } catch (error) {
+           
+            toast.error(error.message || 'Failed to fetch products');
+        }
     }
 
     const fetchUserData = async () => {
-        setUserData(userDummyData)
+        try {
+            // Check if user exists and has publicMetadata before accessing isSeller
+            if (user.publicMetadata.role === 'seller') {
+                setIsSeller(true);
+            }
+
+            const token = await getToken();
+            const {data} = await axios.get('/api/user/data', { headers: { Authorization: `Bearer ${token}` }});
+          
+            if (data.success) {
+                setUserData(data.user);
+                setCartItems(data.user.cartItems || {});
+            } else {
+                // If user not found, it means they haven't been synced to DB yet
+                // This is normal for new users - just use default values
+                console.log('User not found in database, using default values');
+                setCartItems({});
+            }
+                    
+        } catch (error) {
+            console.error('Error fetching user data:', error);
+            // Don't show error toast for new users who aren't in DB yet
+            if (!error.response?.data?.message?.includes('User not found')) {
+                toast.error(error.message || 'Failed to fetch user data');
+            }
+            // Set default values on error
+            setCartItems({});
+        }
     }
 
     const addToCart = async (itemId) => {
@@ -80,11 +123,13 @@ export const AppContextProvider = (props) => {
     }, [])
 
     useEffect(() => {
-        fetchUserData()
-    }, [])
+        if (user && getToken) {
+            fetchUserData()
+        }
+    }, [user, getToken])
 
     const value = {
-        user,
+        user, getToken,
         currency, router,
         isSeller, setIsSeller,
         userData, fetchUserData,
