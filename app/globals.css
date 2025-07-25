@@ -6,6 +6,36 @@
     scroll-behavior: smooth;
 }
 
+/* Performance optimizations */
+* {
+    box-sizing: border-box;
+}
+
+button, .cursor-pointer {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    transform: translateZ(0); /* Force hardware acceleration */
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+/* Smooth image loading */
+img {
+    content-visibility: auto;
+}
+
+/* Optimize animations */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
 @layer base {
     input[type="number"]::-webkit-inner-spin-button,
     input[type="number"]::-webkit-outer-spin-button {

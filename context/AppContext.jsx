@@ -4,7 +4,7 @@ import { useAuth, useUser } from "@clerk/nextjs";
 import axios from "axios";
 import { err } from "inngest/types";
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import toast from "react-hot-toast";
 
 export const AppContext = createContext();
@@ -24,6 +24,8 @@ export const AppContextProvider = (props) => {
     const [userData, setUserData] = useState(false)
     const [isSeller, setIsSeller] = useState(false)
     const [cartItems, setCartItems] = useState({})
+    const [isUpdatingCart, setIsUpdatingCart] = useState(false)
+    const cartUpdateTimeoutRef = useRef(null)
 
     const fetchProductData = async () => {
         try {
@@ -72,58 +74,60 @@ export const AppContextProvider = (props) => {
         }
     }
 
-    const addToCart = async (itemId) => {
+    const debouncedCartUpdate = useCallback(async (cartData) => {
+        if (!user) return;
+        
+        try {
+            setIsUpdatingCart(true);
+            const token = await getToken();
+            await axios.post('/api/cart/update', cartData, { 
+                headers: { Authorization: `Bearer ${token}` } 
+            });
+        } catch (error) {
+            toast.error('Failed to update cart');
+            console.error('Cart update error:', error);
+        } finally {
+            setIsUpdatingCart(false);
+        }
+    }, [user, getToken]);
 
+    const addToCart = useCallback(async (itemId) => {
         let cartData = structuredClone(cartItems);
         if (cartData[itemId]) {
             cartData[itemId] += 1;
-        }
-        else {
+        } else {
             cartData[itemId] = 1;
         }
         setCartItems(cartData);
        
-        if (user) {
-            try {
-                
-                const token = await getToken();
-
-                await axios.post('/api/cart/update', cartData, { headers: { Authorization: `Bearer ${token}` } });
-
-                 toast.success('Item added to cart');
-
-            } catch (error) {
-                toast.error(error.message)
-            }
+        // Debounce API call
+        if (cartUpdateTimeoutRef.current) {
+            clearTimeout(cartUpdateTimeoutRef.current);
         }
+        cartUpdateTimeoutRef.current = setTimeout(() => {
+            debouncedCartUpdate(cartData);
+        }, 500); // Wait 500ms before sending API request
+    }, [cartItems, debouncedCartUpdate]);
 
-    }
-
-    const updateCartQuantity = async (itemId, quantity) => {
-
+    const updateCartQuantity = useCallback(async (itemId, quantity) => {
         let cartData = structuredClone(cartItems);
         if (quantity === 0) {
             delete cartData[itemId];
         } else {
             cartData[itemId] = quantity;
         }
-        setCartItems(cartData)
- if (user) {
-            try {
-                
-                const token = await getToken();
-
-                await axios.post('/api/cart/update', cartData, { headers: { Authorization: `Bearer ${token}` } });
-
-                 toast.success('Cart updated');
-
-            } catch (error) {
-                toast.error(error.message)
-            }
+        setCartItems(cartData);
+        
+        // Debounce API call
+        if (cartUpdateTimeoutRef.current) {
+            clearTimeout(cartUpdateTimeoutRef.current);
         }
-    }
+        cartUpdateTimeoutRef.current = setTimeout(() => {
+            debouncedCartUpdate(cartData);
+        }, 500); // Wait 500ms before sending API request
+    }, [cartItems, debouncedCartUpdate]);
 
-    const getCartCount = () => {
+    const getCartCount = useMemo(() => {
         if (!cartItems) return 0;
         let totalCount = 0;
         for (const items in cartItems) {
@@ -132,9 +136,9 @@ export const AppContextProvider = (props) => {
             }
         }
         return totalCount;
-    }
+    }, [cartItems]);
 
-    const getCartAmount = () => {
+    const getCartAmount = useMemo(() => {
         if (!cartItems || !products.length) return 0;
         let totalAmount = 0;
         for (const items in cartItems) {
@@ -144,7 +148,7 @@ export const AppContextProvider = (props) => {
             }
         }
         return Math.floor(totalAmount * 100) / 100;
-    }
+    }, [cartItems, products]);
 
     useEffect(() => {
         fetchProductData()
@@ -162,7 +166,7 @@ export const AppContextProvider = (props) => {
         isSeller, setIsSeller,
         userData, fetchUserData,
         products, fetchProductData,
-        cartItems, setCartItems,
+        cartItems, setCartItems, isUpdatingCart,
         addToCart, updateCartQuantity,
         getCartCount, getCartAmount
     }

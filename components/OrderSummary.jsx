@@ -3,6 +3,7 @@ import { useAppContext } from "@/context/AppContext";
 import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import axios from "axios";
+import LoadingSpinner from "./LoadingSpinner";
 
 
 const OrderSummary = () => {
@@ -10,13 +11,16 @@ const OrderSummary = () => {
   const { currency, router, getCartCount, getCartAmount, getToken, user, cartItems, setCartItems } = useAppContext()
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
   const [userAddresses, setUserAddresses] = useState([]);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
 
   const fetchUserAddresses = async () => {
+    if (isLoadingAddresses) return; // Prevent duplicate calls
 
     try {
-
+      setIsLoadingAddresses(true);
       const token = await getToken();
       const { data } = await axios.get('/api/user/get-address', {
         headers: { Authorization: `Bearer ${token}` }
@@ -34,9 +38,9 @@ const OrderSummary = () => {
     } catch (error) {
       console.error('Error fetching user addresses:', error);
       toast.error('Failed to fetch addresses');
+    } finally {
+      setIsLoadingAddresses(false);
     }
-
-    
   }
 
   const handleAddressSelect = (address) => {
@@ -45,7 +49,10 @@ const OrderSummary = () => {
   };
 
   const createOrder = async () => {
+    if (isCreatingOrder) return; // Prevent double-clicks
+
     try {
+      setIsCreatingOrder(true);
 
       if (!selectedAddress) {
         toast.error("Please select an address");
@@ -86,6 +93,8 @@ const OrderSummary = () => {
     } catch (error) {
       console.error("Error creating order:", error);
       toast.error("Failed to create order");
+    } finally {
+      setIsCreatingOrder(false);
     }
   }
 
@@ -110,13 +119,21 @@ const OrderSummary = () => {
           </label>
           <div className="relative inline-block w-full text-sm border">
             <button
-              className="peer w-full text-left px-4 pr-2 py-2 bg-white text-gray-700 focus:outline-none"
+              className="peer w-full text-left px-4 pr-2 py-2 bg-white text-gray-700 focus:outline-none disabled:opacity-50"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              disabled={isLoadingAddresses}
             >
               <span>
-                {selectedAddress
-                  ? `${selectedAddress.fullName}, ${selectedAddress.area}, ${selectedAddress.city}, ${selectedAddress.state}`
-                  : "Select Address"}
+                {isLoadingAddresses ? (
+                  <div className="flex items-center gap-2">
+                    <LoadingSpinner size="sm" />
+                    Loading addresses...
+                  </div>
+                ) : selectedAddress ? (
+                  `${selectedAddress.fullName}, ${selectedAddress.area}, ${selectedAddress.city}, ${selectedAddress.state}`
+                ) : (
+                  "Select Address"
+                )}
               </span>
               <svg className={`w-5 h-5 inline float-right transition-transform duration-200 ${isDropdownOpen ? "rotate-0" : "-rotate-90"}`}
                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#6B7280"
@@ -167,8 +184,8 @@ const OrderSummary = () => {
 
         <div className="space-y-4">
           <div className="flex justify-between text-base font-medium">
-            <p className="uppercase text-gray-600">Items {getCartCount()}</p>
-            <p className="text-gray-800">{currency}{getCartAmount()}</p>
+            <p className="uppercase text-gray-600">Items {getCartCount}</p>
+            <p className="text-gray-800">{currency}{getCartAmount}</p>
           </div>
           <div className="flex justify-between">
             <p className="text-gray-600">Shipping Fee</p>
@@ -176,17 +193,32 @@ const OrderSummary = () => {
           </div>
           <div className="flex justify-between">
             <p className="text-gray-600">Tax (2%)</p>
-            <p className="font-medium text-gray-800">{currency}{Math.floor(getCartAmount() * 0.02)}</p>
+            <p className="font-medium text-gray-800">{currency}{Math.floor(getCartAmount * 0.02)}</p>
           </div>
           <div className="flex justify-between text-lg md:text-xl font-medium border-t pt-3">
             <p>Total</p>
-            <p>{currency}{getCartAmount() + Math.floor(getCartAmount() * 0.02)}</p>
+            <p>{currency}{getCartAmount + Math.floor(getCartAmount * 0.02)}</p>
           </div>
         </div>
       </div>
 
-      <button onClick={createOrder} className="w-full bg-orange-600 text-white py-3 mt-5 hover:bg-orange-700">
-        Place Order
+      <button 
+        onClick={createOrder} 
+        disabled={isCreatingOrder || getCartCount === 0}
+        className={`w-full py-3 mt-5 text-white font-medium transition-all duration-200 ${
+          isCreatingOrder || getCartCount === 0 
+            ? 'bg-gray-400 cursor-not-allowed' 
+            : 'bg-orange-600 hover:bg-orange-700 active:bg-orange-800'
+        }`}
+      >
+        {isCreatingOrder ? (
+          <div className="flex items-center justify-center gap-2">
+            <LoadingSpinner size="sm" className="border-white border-t-transparent" />
+            Placing Order...
+          </div>
+        ) : (
+          'Place Order'
+        )}
       </button>
     </div>
   );
