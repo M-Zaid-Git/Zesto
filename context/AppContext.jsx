@@ -82,6 +82,20 @@ export const AppContextProvider = (props) => {
             cartData[itemId] = 1;
         }
         setCartItems(cartData);
+       
+        if (user) {
+            try {
+                
+                const token = await getToken();
+
+                await axios.post('/api/cart/update', cartData, { headers: { Authorization: `Bearer ${token}` } });
+
+                 toast.success('Item added to cart');
+
+            } catch (error) {
+                toast.error(error.message)
+            }
+        }
 
     }
 
@@ -94,10 +108,23 @@ export const AppContextProvider = (props) => {
             cartData[itemId] = quantity;
         }
         setCartItems(cartData)
+ if (user) {
+            try {
+                
+                const token = await getToken();
 
+                await axios.post('/api/cart/update', cartData, { headers: { Authorization: `Bearer ${token}` } });
+
+                 toast.success('Cart updated');
+
+            } catch (error) {
+                toast.error(error.message)
+            }
+        }
     }
 
     const getCartCount = () => {
+        if (!cartItems) return 0;
         let totalCount = 0;
         for (const items in cartItems) {
             if (cartItems[items] > 0) {
@@ -108,10 +135,11 @@ export const AppContextProvider = (props) => {
     }
 
     const getCartAmount = () => {
+        if (!cartItems || !products.length) return 0;
         let totalAmount = 0;
         for (const items in cartItems) {
             let itemInfo = products.find((product) => product._id === items);
-            if (cartItems[items] > 0) {
+            if (cartItems[items] > 0 && itemInfo) {
                 totalAmount += itemInfo.offerPrice * cartItems[items];
             }
         }

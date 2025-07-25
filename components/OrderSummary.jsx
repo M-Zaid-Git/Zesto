@@ -1,17 +1,42 @@
 import { addressDummyData } from "@/assets/assets";
 import { useAppContext } from "@/context/AppContext";
 import React, { useEffect, useState } from "react";
+import toast from "react-hot-toast";
+import axios from "axios";
+
 
 const OrderSummary = () => {
 
-  const { currency, router, getCartCount, getCartAmount } = useAppContext()
+  const { currency, router, getCartCount, getCartAmount, getToken, user, cartItems, setCartItems } = useAppContext()
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const [userAddresses, setUserAddresses] = useState([]);
 
   const fetchUserAddresses = async () => {
-    setUserAddresses(addressDummyData);
+
+    try {
+
+      const token = await getToken();
+      const { data } = await axios.get('/api/user/get-address', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (data.success) {
+        setUserAddresses(data.addresses);
+        if (data.addresses.length > 0) {
+          setSelectedAddress(data.addresses[0]);
+        } 
+      } else {
+       toast.error(data.message);
+      }
+
+    } catch (error) {
+      console.error('Error fetching user addresses:', error);
+      toast.error('Failed to fetch addresses');
+    }
+
+    
   }
 
   const handleAddressSelect = (address) => {
@@ -20,12 +45,57 @@ const OrderSummary = () => {
   };
 
   const createOrder = async () => {
+    try {
 
+      if (!selectedAddress) {
+        toast.error("Please select an address");
+        return;
+      }
+
+      // Fix: cartItems structure - values are numbers, not objects with quantity
+      let cartItemsArray = Object.keys(cartItems).map(key => ({
+        product: key,
+        quantity: cartItems[key] // cartItems[key] is already the quantity number
+      }));
+      cartItemsArray = cartItemsArray.filter(item => item.quantity > 0);
+
+      if (cartItemsArray.length === 0) {
+        toast.error("Your cart is empty");
+        return; // Fix: Add return to stop execution
+      }
+
+      const token = await getToken();
+
+      // Fix: Remove unnecessary get-address call
+      const response = await axios.post('/api/order/create', {
+        address: selectedAddress._id,
+        items: cartItemsArray
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Fix: Check response from order creation, not from get-address
+      if (response.data.success) {
+        toast.success("Order placed successfully");
+        setCartItems({});
+        router.push("/order-placed");
+      } else {
+        toast.error(response.data.message || "Failed to create order");
+      }
+      
+    } catch (error) {
+      console.error("Error creating order:", error);
+      toast.error("Failed to create order");
+    }
   }
 
   useEffect(() => {
-    fetchUserAddresses();
-  }, [])
+
+    if (user) {
+      fetchUserAddresses();
+    }
+
+  }, [user])
 
   return (
     <div className="w-full md:w-96 bg-gray-500/5 p-5">

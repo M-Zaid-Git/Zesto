@@ -40,10 +40,10 @@ const Cart = () => {
                 </tr>
               </thead>
               <tbody>
-                {Object.keys(cartItems).map((itemId) => {
+                {cartItems && Object.keys(cartItems).map((itemId) => {
                   const product = products.find(product => product._id === itemId);
 
-                  if (!product || cartItems[itemId] <= 0) return null;
+                  if (!product || cartItems[itemId] <= 0 || !product.images || product.images.length === 0) return null;
 
                   return (
                     <tr key={itemId}>
@@ -51,7 +51,7 @@ const Cart = () => {
                         <div>
                           <div className="rounded-lg overflow-hidden bg-gray-500/10 p-2">
                             <Image
-                              src={product.image[0]}
+                              src={product.images[0]}
                               alt={product.name}
                               className="w-16 h-auto object-cover mix-blend-multiply"
                               width={1280}
